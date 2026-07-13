@@ -21,10 +21,11 @@ use rspack_cacheable::{
   with::{AsCacheable, AsOption, AsPreset, AsVec},
 };
 use rspack_core::{
-  AsyncDependenciesBlock, BoxDependency, BoxDependencyTemplate, BuildInfo, BuildMeta,
+  ArcComputed, AsyncDependenciesBlock, BoxDependency, BoxDependencyTemplate, BuildInfo, BuildMeta,
   CompilerOptions, DependencyId, DependencyLocation, DependencyRange, FactoryMeta, ImportMeta,
-  JavascriptParserCommonjsExportsOption, JavascriptParserOptions, ModuleIdentifier, ModuleLayer,
-  ModuleType, ParseMeta, ResourceData, SideEffectsBailoutItemWithSpan,
+  ImportMetaKnownProperties, JavascriptParserCommonjsExportsOption, JavascriptParserOptions,
+  ModuleIdentifier, ModuleLayer, ModuleType, ParseMeta, ResolvedModuleOptions, ResourceData,
+  SideEffectsBailoutItemWithSpan,
 };
 use rspack_error::{Diagnostic, Result};
 use rspack_util::fx_hash::FxIndexSet;
@@ -435,6 +436,7 @@ impl<'parser> JavascriptParser<'parser> {
     ast: &'parser ParsedJavaScriptAst<'parser>,
     compiler_options: &'parser CompilerOptions,
     javascript_options: &'parser JavascriptParserOptions,
+    import_meta: ArcComputed<ResolvedModuleOptions, ImportMeta>,
     module_identifier: &'parser ModuleIdentifier,
     module_type: &'parser ModuleType,
     module_layer: Option<&'parser ModuleLayer>,
@@ -477,15 +479,14 @@ impl<'parser> JavascriptParser<'parser> {
       plugins.push(Box::new(parser_plugin::ESMTopLevelThisParserPlugin));
       plugins.push(Box::<parser_plugin::ESMDetectionParserPlugin>::default());
       plugins.push(Box::new(
-        parser_plugin::ImportMetaContextDependencyParserPlugin,
+        parser_plugin::ImportMetaContextDependencyParserPlugin {
+          webpack_context: import_meta
+            .is_known_property_enabled(ImportMetaKnownProperties::WEBPACK_CONTEXT),
+          glob: import_meta.is_known_property_enabled(ImportMetaKnownProperties::GLOB),
+        },
       ));
-      if matches!(
-        javascript_options.import_meta,
-        Some(ImportMeta::Enabled | ImportMeta::PreserveUnknown)
-      ) {
-        plugins.push(Box::new(parser_plugin::ImportMetaPlugin(
-          javascript_options.import_meta.expect("should have value"),
-        )));
+      if import_meta.is_enabled() {
+        plugins.push(Box::new(parser_plugin::ImportMetaPlugin(import_meta)));
       } else {
         plugins.push(Box::new(parser_plugin::ImportMetaDisabledPlugin));
       }
@@ -521,15 +522,11 @@ impl<'parser> JavascriptParser<'parser> {
       }
     }
 
-    // NodeStuffPlugin: handle __dirname/__filename/global (CJS) and import.meta.dirname/filename (ESM)
-    // CJS features require node options; ESM features are always available for ESM-capable modules
+    // NodeStuffPlugin handles __dirname/__filename/global (CJS).
     let handle_cjs =
       (module_type.is_js_auto() || module_type.is_js_dynamic()) && compiler_options.node.is_some();
-    let handle_esm = module_type.is_js_auto() || module_type.is_js_esm();
-    if handle_cjs || handle_esm {
-      plugins.push(Box::new(parser_plugin::NodeStuffPlugin::new(
-        handle_cjs, handle_esm,
-      )));
+    if handle_cjs {
+      plugins.push(Box::new(parser_plugin::NodeStuffPlugin::new(handle_cjs)));
     }
 
     if module_type.is_js_auto() || module_type.is_js_dynamic() || module_type.is_js_esm() {
