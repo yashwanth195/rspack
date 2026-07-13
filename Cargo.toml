@@ -46,6 +46,7 @@ either              = { version = "1.15.0", default-features = false }
 enum-tag            = { version = "0.3.0", default-features = false }
 fast-glob           = { version = "1.0.1", default-features = false }
 form_urlencoded     = { version = "1.2.2", default-features = false }
+fs-err              = { version = "3.3.1", default-features = false }
 futures             = { version = "0.3.32", default-features = false, features = ["std"] }
 hashlink            = { version = "0.11.0", default-features = false }
 heck                = { version = "0.5.0", default-features = false }
@@ -102,6 +103,7 @@ static_assertions   = { version = "1.1.0", default-features = false }
 sugar_path          = { version = "2.0.1", default-features = false, features = ["cached_current_dir"] }
 supports-color      = { version = "3.0.2", default-features = false }
 syn                 = { version = "2.0.117", default-features = false }
+tempfile            = { version = "3.27.0", default-features = false }
 termcolor           = { version = "1.4.1", default-features = false }
 textwrap            = { version = "0.16.1", default-features = false }
 thread_local        = { version = "1.1.9", default-features = false }
